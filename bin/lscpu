@@ -1,0 +1,32 @@
+#!/bin/zsh
+# lscpu: CPU summary in the Linux layout, from sysctl.
+source "${0:A:h:h}/lib/common.zsh"
+
+s() { sysctl -n $1 2>/dev/null }
+row() { printf '%-23s %s\n' "$1:" "$2" }
+
+typeset arch=$(uname -m) model=$(s machdep.cpu.brand_string)
+typeset -i log=$(s hw.logicalcpu) phy=$(s hw.physicalcpu) pkgs=$(s hw.packages)
+(( pkgs )) || pkgs=1
+row Architecture "$arch"
+row "CPU op-mode(s)" "64-bit"
+row "Byte Order" "Little Endian"
+row "CPU(s)" $log
+row "Vendor ID" "$( [[ $arch == arm64 ]] && print Apple || s machdep.cpu.vendor )"
+row "Model name" "$model"
+row "Thread(s) per core" $(( log / phy ))
+row "Core(s) per socket" $(( phy / pkgs ))
+row "Socket(s)" $pkgs
+typeset -i f=$(s hw.cpufrequency_max)
+(( f )) && row "CPU max MHz" $(( f / 1000000 ))
+typeset -i c
+c=$(s hw.l1dcachesize); (( c )) && row "L1d cache" "$(( c / 1024 )) KiB"
+c=$(s hw.l1icachesize); (( c )) && row "L1i cache" "$(( c / 1024 )) KiB"
+c=$(s hw.l2cachesize);  (( c )) && row "L2 cache"  "$(( c / 1048576 )) MiB"
+c=$(s hw.l3cachesize);  (( c )) && row "L3 cache"  "$(( c / 1048576 )) MiB"
+if [[ $arch == arm64 ]]; then
+  typeset -i pc=$(s hw.perflevel0.physicalcpu) ec=$(s hw.perflevel1.physicalcpu)
+  (( pc )) && row "Performance cores" $pc
+  (( ec )) && row "Efficiency cores" $ec
+fi
+true

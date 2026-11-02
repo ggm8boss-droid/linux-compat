@@ -1,0 +1,25 @@
+#!/bin/zsh
+# pidof NAME...: PIDs on one line.
+source "${0:A:h:h}/lib/common.zsh"
+
+typeset a
+typeset -i single=0
+typeset -a pids omit names
+while (( $# )); do
+  a=$1; shift
+  case $a in
+    -s) single=1;;
+    -o) omit+=(${(s:,:)1}); shift;;
+    -o*) omit+=(${(s:,:)${a#-o}});;
+    -*) ;;
+    *) names+=("$a");;
+  esac
+done
+for a in $names; do
+  pids+=(${(f)"$(pgrep -x -- "$a")"})
+done
+pids=(${pids:|omit})
+pids=(${(On)pids})
+(( $#pids )) || exit 1
+(( single )) && pids=($pids[1])
+print -r -- "${(j: :)pids}"

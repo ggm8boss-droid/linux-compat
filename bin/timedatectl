@@ -1,0 +1,23 @@
+#!/bin/zsh
+# timedatectl -> date / systemsetup
+source "${0:A:h:h}/lib/common.zsh"
+
+typeset tz=${$(readlink /etc/localtime)#*zoneinfo/}
+case $1 in
+  ''|status)
+    printf '%25s: %s\n' "Local time" "$(date '+%a %Y-%m-%d %H:%M:%S %Z')"
+    printf '%25s: %s\n' "Universal time" "$(date -u '+%a %Y-%m-%d %H:%M:%S UTC')"
+    printf '%25s: %s\n' "Time zone" "$tz ($(date +%Z), $(date +%z))"
+    printf '%25s: %s\n' "NTP service" "active";;
+  list-timezones)
+    (cd /usr/share/zoneinfo && print -rl -- **/*(.) | grep -v -e '^posix' -e '^right' -e '^+' -e '\.tab$' | sort);;
+  set-timezone)
+    _lc_log "→ systemsetup -settimezone $2"
+    sudo systemsetup -settimezone "$2";;
+  set-ntp)
+    typeset v=off
+    [[ $2 == (true|yes|on|1) ]] && v=on
+    _lc_log "→ systemsetup -setusingnetworktime $v"
+    sudo systemsetup -setusingnetworktime $v;;
+  *) _lc_err "Unknown command verb $1."; exit 1;;
+esac

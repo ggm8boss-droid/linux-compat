@@ -1,0 +1,35 @@
+#!/bin/zsh
+# timeout DURATION COMMAND...: exit 124 if the command is still running after DURATION.
+source "${0:A:h:h}/lib/common.zsh"
+_lc_exec_gnu timeout "$@"
+
+typeset sig=TERM a
+typeset -i preserve=0
+while [[ $1 == -* ]]; do
+  a=$1; shift
+  case $a in
+    -s|--signal) sig=$1; shift;;
+    --signal=*)  sig=${a#*=};;
+    -s*)         sig=${a#-s};;
+    -k|--kill-after) shift;;
+    --preserve-status) preserve=1;;
+    --) break;;
+  esac
+done
+typeset d=$1; shift
+if (( ! $# )); then _lc_err "timeout: missing operand"; exit 125; fi
+case $d in
+  *s) d=${d%s};; *m) d=$(( ${d%m} * 60 ));; *h) d=$(( ${d%h} * 3600 ));; *d) d=$(( ${d%d} * 86400 ));;
+esac
+exec perl -MTime::HiRes=alarm -e '
+  my ($t, $sig, $keep) = splice @ARGV, 0, 3;
+  my $pid = fork // exit 125;
+  if (!$pid) { exec { $ARGV[0] } @ARGV or exit 127 }
+  my $hit = 0;
+  $SIG{ALRM} = sub { $hit = 1; kill $sig, $pid };
+  alarm $t if $t > 0;
+  1 while waitpid($pid, 0) == -1 && $!{EINTR};
+  my $st = $?;
+  exit 124 if $hit && !$keep;
+  exit($st & 127 ? 128 + ($st & 127) : $st >> 8);
+' -- "$d" "${sig#SIG}" $preserve "$@"

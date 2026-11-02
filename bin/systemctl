@@ -1,0 +1,104 @@
+#!/bin/zsh
+# systemctl / service -> brew services (and a few macOS built-ins).
+source "${0:A:h:h}/lib/common.zsh"
+setopt extended_glob
+
+typeset verb= a
+typeset -a units
+
+if [[ ${0:t} == service ]]; then           # service NAME ACTION
+  if [[ $1 == --status-all ]]; then set -- list-units; else set -- ${2:-status} $1; fi
+fi
+for a; do
+  case $a in
+    -*) ;;                                  # --now, --user, --no-pager, -l, ...
+    *) if [[ -z $verb ]]; then verb=$a; else units+=(${a%.service}); fi;;
+  esac
+done
+
+_svc_running() { _lc_brew services info $1 --json 2>/dev/null | command grep -q '"running": *true' }
+_svc_loaded()  { _lc_brew services info $1 --json 2>/dev/null | command grep -q '"loaded": *true' }
+
+# Linux unit name -> brew service name (in REPLY), or @docker/@ssh/@builtin.
+_svc_resolve() {
+  local u=$1 n
+  local -a names
+  local -A alias
+  case $u in
+    docker|docker.socket|containerd) REPLY=@docker; return 0;;
+    ssh|sshd|openssh-server)         REPLY=@ssh; return 0;;
+    cron|crond|dbus|udev|rsyslog|networking|network|NetworkManager|systemd-*) REPLY=@builtin; return 0;;
+  esac
+  alias=(mysqld mysql  redis-server redis  apache2 httpd  mongod mongodb-community
+         mongodb mongodb-community  rabbitmq-server rabbitmq  postgres postgresql  pgsql postgresql)
+  u=${alias[$u]:-$u}
+  names=(${(f)"$(_lc_brew services list 2>/dev/null | command awk 'NR > 1 { print $1 }')"})
+  if (( ${names[(Ie)$u]} )); then REPLY=$u; return 0; fi
+  n=${${(M)names:#${u}[@-]*}[1]}            # postgresql -> postgresql@17, php -> php@8.3
+  [[ -n $n ]] || n=${${(M)names:#${u}*}[1]}
+  [[ -n $n ]] || return 1
+  REPLY=$n
+}
+
+_unit() {
+  local verb=$1 u=$2 n REPLY
+  if ! _svc_resolve $u; then
+    case $verb in
+      is-active)  print inactive; return 3;;
+      is-enabled) _lc_err "Failed to get unit file state for $u.service: No such file or directory"; return 1;;
+      status)     _lc_err "Unit $u.service could not be found."; return 4;;
+      *)          _lc_err "Failed to $verb $u.service: Unit $u.service not found."; return 5;;
+    esac
+  fi
+  n=$REPLY
+  case $n in
+    @builtin)
+      case $verb in is-active|status) print active;; is-enabled) print enabled;; esac
+      return 0;;
+    @docker)
+      case $verb in
+        start|enable|restart) _lc_log "→ open -a Docker"; open -a Docker;;
+        stop|disable)         _lc_log "→ quit Docker Desktop"; osascript -e 'quit app "Docker"';;
+        status|is-active)     if docker info &>/dev/null; then print active; else print inactive; return 3; fi;;
+        is-enabled)           print enabled;;
+      esac
+      return;;
+    @ssh)
+      case $verb in
+        start|enable|restart) _lc_log "→ systemsetup -setremotelogin on"; command sudo systemsetup -setremotelogin on;;
+        stop|disable)         _lc_log "→ systemsetup -setremotelogin off"; command sudo systemsetup -f -setremotelogin off;;
+        *)                    command sudo systemsetup -getremotelogin;;
+      esac
+      return;;
+  esac
+  case $verb in
+    start)                    _lc_brew services run $n;;
+    enable)                   _lc_brew services start $n;;
+    stop|kill)                _lc_brew services kill $n 2>/dev/null || _lc_brew services stop $n;;
+    disable)                  _lc_brew services stop $n;;
+    restart|reload|try-restart|reload-or-restart|condrestart) _lc_brew services restart $n;;
+    status)                   _lc_brew services info $n; _svc_running $n || return 3;;
+    is-active)                if _svc_running $n; then print active; else print inactive; return 3; fi;;
+    is-enabled)               if _svc_loaded $n; then print enabled; else print disabled; return 1; fi;;
+    is-failed)                print inactive; return 1;;
+    mask|unmask)              return 0;;
+  esac
+}
+
+typeset -i rc=0
+case $verb in
+  ''|list-units|list-unit-files|list-timers|list-dependencies) _lc_brew services list;;
+  daemon-reload|daemon-reexec|reset-failed|preset) exit 0;;
+  reboot)   exec sudo shutdown -r now;;
+  poweroff|halt) exec sudo shutdown -h now;;
+  suspend|hibernate) exec pmset sleepnow;;
+  start|stop|restart|reload|try-restart|reload-or-restart|condrestart|enable|disable|status|\
+  is-active|is-enabled|is-failed|kill|mask|unmask)
+    if (( ! $#units )); then
+      [[ $verb == status ]] && { _lc_brew services list; exit }
+      _lc_err "Too few arguments."; exit 1
+    fi
+    for a in $units; do _unit $verb $a || rc=$?; done
+    exit $rc;;
+  *) _lc_err "Unknown command verb $verb."; exit 1;;
+esac

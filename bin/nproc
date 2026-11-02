@@ -1,0 +1,16 @@
+#!/bin/zsh
+# nproc: number of CPUs.
+source "${0:A:h:h}/lib/common.zsh"
+_lc_exec_gnu nproc "$@"
+
+typeset -i n=$(sysctl -n hw.logicalcpu) ignore=0
+typeset a
+while (( $# )); do
+  a=$1; shift
+  case $a in
+    --ignore=*) ignore=${a#*=};;
+    --ignore)   ignore=$1; shift;;
+  esac
+done
+(( n -= ignore, n < 1 && (n = 1) ))
+print $n

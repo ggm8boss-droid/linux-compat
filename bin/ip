@@ -1,0 +1,168 @@
+#!/bin/zsh
+# ip (iproute2) -> ifconfig / netstat -rn / arp / route, printed in the Linux layout.
+source "${0:A:h:h}/lib/common.zsh"
+setopt extended_glob
+
+typeset fam= a
+typeset -i brief=0
+while [[ $1 == -* ]]; do
+  case $1 in
+    -4) fam=4;; -6) fam=6;;
+    -br|-brief|--brief) brief=1;;
+    -c|-color|--color|-s|-stats|-d|-details|-o|-oneline|-j|-json|-p|-pretty) ;;
+    -f|-family) fam=${2#inet}; [[ $fam == '' ]] && fam=4; shift;;
+  esac
+  shift
+done
+
+mask2len() {           # 0xffffff00 -> 24
+  local -i m=$(( 16#${1#0x} )) n=0
+  while (( m )); do (( n += m & 1, m >>= 1 )); done
+  print $n
+}
+
+# Parse ifconfig into parallel arrays.
+typeset -a ifs flags mtus macs states addrs
+parse_ifconfig() {
+  local line cur= a
+  local -i idx=0
+  for line in ${(f)"$(ifconfig -a)"}; do
+    if [[ $line == (#b)([^[:space:]]##):\ flags=[0-9]##\<([^\>]#)\>\ mtu\ ([0-9]##)* ]]; then
+      cur=$match[1]; ifs+=($cur); flags+=($match[2]); mtus+=($match[3]); macs+=(''); states+=(UNKNOWN); addrs+=('')
+      idx=$#ifs
+      [[ $match[2] == *UP* ]] || states[idx]=DOWN
+      continue
+    fi
+    (( idx )) || continue
+    case $line in
+      (#b)[[:space:]]##ether\ ([0-9a-f:]##)*) macs[idx]=$match[1];;
+      [[:space:]]##status:\ active*)   states[idx]=UP;;
+      [[:space:]]##status:\ inactive*) states[idx]=DOWN;;
+      (#b)[[:space:]]##inet\ ([0-9.]##)\ netmask\ (0x[0-9a-f]##)(\ broadcast\ ([0-9.]##)|)*)
+        a="inet $match[1]/$(mask2len $match[2])"
+        [[ -n $match[4] ]] && a+=" brd $match[4]"
+        if [[ $match[1] == 127.* ]]; then a+=" scope host $cur"; else a+=" scope global $cur"; fi
+        addrs[idx]+=$a$'\n';;
+      (#b)[[:space:]]##inet\ ([0-9.]##)\ --\>\ ([0-9.]##)\ netmask\ (0x[0-9a-f]##)*)
+        addrs[idx]+="inet $match[1] peer $match[2]/$(mask2len $match[3]) scope global $cur"$'\n';;
+      (#b)[[:space:]]##inet6\ ([0-9a-f:]##)(%[^ ]#|)\ prefixlen\ ([0-9]##)*)
+        a="inet6 $match[1]/$match[3]"
+        case $match[1] in
+          ::1) a+=" scope host";; fe80:*) a+=" scope link";; *) a+=" scope global";;
+        esac
+        addrs[idx]+=$a$'\n';;
+    esac
+  done
+}
+
+show_addr() {          # $1 = link-only?, $2 = device filter
+  local -i i link=$1
+  local dev=$2 l kind
+  parse_ifconfig
+  for (( i = 1; i <= $#ifs; i++ )); do
+    [[ -n $dev && $ifs[i] != $dev ]] && continue
+    if (( brief )); then
+      local -a list=()
+      for l in ${(f)addrs[i]}; do
+        [[ $fam == 4 && $l != inet\ * ]] && continue
+        [[ $fam == 6 && $l != inet6\ * ]] && continue
+        l=${${l#* }%% *}; list+=($l)
+      done
+      if (( link )); then
+        printf '%-16s %-14s %s <%s>\n' $ifs[i] $states[i] "${macs[i]:-00:00:00:00:00:00}" $flags[i]
+      else
+        printf '%-16s %-14s %s\n' $ifs[i] $states[i] "${(j: :)list}"
+      fi
+      continue
+    fi
+    print -r -- "$i: $ifs[i]: <$flags[i]> mtu $mtus[i] state $states[i]"
+    if [[ $flags[i] == *LOOPBACK* ]]; then kind="    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00"
+    elif [[ -n $macs[i] ]]; then kind="    link/ether $macs[i] brd ff:ff:ff:ff:ff:ff"
+    else kind="    link/none"; fi
+    print -r -- $kind
+    (( link )) && continue
+    for l in ${(f)addrs[i]}; do
+      [[ $fam == 4 && $l != inet\ * ]] && continue
+      [[ $fam == 6 && $l != inet6\ * ]] && continue
+      print -r -- "    $l"
+    done
+  done
+  return 0
+}
+
+show_route() {
+  local line dst gw fl ifc n
+  local -a f
+  for line in ${(f)"$(netstat -rn -f inet${fam:#4})"}; do
+    f=(${=line})
+    (( $#f >= 4 )) || continue
+    dst=$f[1] gw=$f[2] fl=$f[3] ifc=$f[4]
+    [[ $dst == (Destination|Internet*|Routing) ]] && continue
+    [[ $gw == [0-9a-f](#c1,2):[0-9a-f](#c1,2):* && $gw != *::* ]] && continue   # ARP entries
+    if [[ $dst != default && $dst != */* && $dst != *:* ]]; then          # "192.168.1" -> "192.168.1.0/24"
+      n=${#${dst//[^.]/}}; (( n++ ))
+      if (( n < 4 )); then
+        repeat $(( 4 - n )) dst+=.0
+        dst+=/$(( n * 8 ))
+      fi
+    fi
+    if [[ $gw == link\#* ]]; then
+      print -r -- "$dst dev $ifc scope link"
+    else
+      print -r -- "$dst via $gw dev $ifc"
+    fi
+  done
+  return 0
+}
+
+show_neigh() {
+  local line
+  for line in ${(f)"$(arp -an)"}; do
+    if [[ $line == (#b)\?\ \(([^\)]##)\)\ at\ ([^ ]##)\ on\ ([^ ]##)* ]]; then
+      if [[ $match[2] == '(incomplete)' ]]; then
+        print -r -- "$match[1] dev $match[3] FAILED"
+      else
+        print -r -- "$match[1] dev $match[3] lladdr $match[2] REACHABLE"
+      fi
+    fi
+  done
+  return 0
+}
+
+typeset obj=${1:-addr}; (( $# )) && shift
+typeset act=${1:-show}; (( $# )) && shift
+[[ $act == dev ]] && { act=show; set -- dev "$@" }
+case $obj in
+  a|ad|add|addr|addre|addres|address)
+    case $act in
+      show|list|lst|s|sh) [[ $1 == dev ]] && shift; show_addr 0 "$1";;
+      add|del|delete)                       # ip addr add 10.0.0.5/24 dev en0
+        typeset ad=$1 dv=$3
+        if [[ $act == add ]]; then _lc_log "→ ifconfig $dv inet $ad alias"; exec sudo ifconfig $dv inet $ad alias
+        else _lc_log "→ ifconfig $dv inet ${ad%/*} -alias"; exec sudo ifconfig $dv inet ${ad%/*} -alias; fi;;
+      *) show_addr 0 "$act";;
+    esac;;
+  l|li|lin|link)
+    case $act in
+      show|list|s|sh) [[ $1 == dev ]] && shift; show_addr 1 "$1";;
+      set)                                  # ip link set en0 up|down
+        [[ $1 == dev ]] && shift
+        _lc_log "→ ifconfig $1 $2"; exec sudo ifconfig $1 $2;;
+      *) show_addr 1 "$act";;
+    esac;;
+  r|ro|rou|rout|route)
+    case $act in
+      show|list|s|sh) show_route;;
+      get)  exec route -n get $1;;
+      add|del|delete)                       # ip route add default via 1.2.3.4
+        typeset dst=$1 gw=
+        typeset -i vi=${argv[(i)via]}
+        (( vi < $# )) && gw=$argv[vi+1]
+        [[ $act == del ]] && act=delete
+        _lc_log "→ route -n $act $dst $gw"; exec sudo route -n $act $dst $gw;;
+      *) show_route;;
+    esac;;
+  n|ne|nei|neigh|neighbor|neighbour) show_neigh;;
+  help|-h) print "usage: ip [-4|-6] [-br] addr|link|route|neigh [show|add|del|set|get] ...";;
+  *) _lc_err "Object \"$obj\" is unknown, try \"ip help\"."; exit 1;;
+esac

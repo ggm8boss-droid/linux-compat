@@ -1,0 +1,80 @@
+#!/bin/zsh
+# free: memory usage in the Linux layout, from vm_stat / sysctl.
+source "${0:A:h:h}/lib/common.zsh"
+setopt extended_glob
+
+typeset unit=k a
+typeset -i base=1024 total_line=0 secs=0 count=0 human=0
+while (( $# )); do
+  a=$1; shift
+  case $a in
+    -b|--bytes) unit=b;;  -k|--kibi) unit=k;;  -m|--mebi) unit=m;;  -g|--gibi) unit=g;;
+    --tebi) unit=t;;  --kilo) unit=k; base=1000;;  --mega) unit=m; base=1000;;
+    --giga) unit=g; base=1000;;  --si) base=1000;;
+    -h|--human) human=1;;
+    -t|--total) total_line=1;;
+    -s|--seconds) secs=${1%.*}; shift;;
+    -c|--count) count=$1; shift;;
+    -[a-z]##) [[ $a == *h* ]] && human=1; [[ $a == *t* ]] && total_line=1
+              [[ $a == *m* ]] && unit=m; [[ $a == *g* ]] && unit=g;;
+  esac
+done
+
+fmt() {        # bytes -> the requested unit
+  local -i b=$1
+  if (( human )); then
+    local -a u=(B Ki Mi Gi Ti Pi); local -i i=1; local -F v=$b
+    (( base == 1000 )) && u=(B K M G T P)
+    while (( v >= base && i < $#u )); do (( v /= base, i++ )); done
+    if (( i == 1 )); then print -r -- "${b}B"
+    elif (( v < 10 )); then printf '%.1f%s\n' $v $u[i]
+    else printf '%.0f%s\n' $v $u[i]; fi
+  else
+    case $unit in
+      b) print $b;; k) print $(( b / base ));; m) print $(( b / base / base ));;
+      g) print $(( b / base / base / base ));; t) print $(( b / base / base / base / base ));;
+    esac
+  fi
+}
+
+swap_bytes() { # "1269.50M" -> bytes
+  local v=$1 n=${1%[KMGT]}
+  local -F f=$n
+  case $v in
+    *K) (( f *= 1024 ));; *M) (( f *= 1048576 ));; *G) (( f *= 1073741824 ));; *T) (( f *= 1099511627776 ));;
+  esac
+  printf '%.0f\n' $f
+}
+
+report() {
+  local line k v
+  local -i pg=4096 total free cache used avail st=0 su=0 sf=0
+  local -A vm
+  for line in ${(f)"$(vm_stat)"}; do
+    if [[ $line == *'page size of '* ]]; then pg=${${line##*page size of }%% *}; continue; fi
+    k=${line%%:*}; v=${${line##*:}//[^0-9]/}
+    vm[$k]=$v
+  done
+  total=$(sysctl -n hw.memsize)
+  local -i pfree=${vm[Pages free]:-0} pspec=${vm[Pages speculative]:-0}
+  local -i pfile=${vm[File-backed pages]:-0} ppurge=${vm[Pages purgeable]:-0}
+  (( free  = (pfree + pspec) * pg ))
+  (( cache = (pfile + ppurge) * pg ))
+  (( used  = total - free - cache ))
+  (( used < 0 )) && used=0
+  (( avail = free + cache ))
+
+  local -a sw; sw=(${=$(sysctl -n vm.swapusage)})    # total = X used = Y free = Z (encrypted)
+  st=$(swap_bytes $sw[3]); su=$(swap_bytes $sw[6]); sf=$(swap_bytes $sw[9])
+
+  printf '%-7s %11s %11s %11s %11s %11s %11s\n' '' total used free shared buff/cache available
+  printf '%-7s %11s %11s %11s %11s %11s %11s\n' Mem: $(fmt $total) $(fmt $used) $(fmt $free) $(fmt 0) $(fmt $cache) $(fmt $avail)
+  printf '%-7s %11s %11s %11s\n' Swap: $(fmt $st) $(fmt $su) $(fmt $sf)
+  (( total_line )) && printf '%-7s %11s %11s %11s\n' Total: $(fmt $(( total + st ))) $(fmt $(( used + su ))) $(fmt $(( free + sf )))
+}
+
+report
+typeset -i iter=1
+while (( secs )) && (( ! count || iter < count )); do
+  sleep $secs; print; report; (( iter++ ))
+done

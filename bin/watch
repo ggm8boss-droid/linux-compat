@@ -1,0 +1,43 @@
+#!/bin/zsh
+# watch: run a command every N seconds, full screen (used only if `brew install watch` hasn't been done).
+source "${0:A:h:h}/lib/common.zsh"
+
+typeset n=2 a
+typeset -i title=1 beep=0 exit_on_err=0
+while [[ $1 == -* ]]; do
+  a=$1; shift
+  case $a in
+    -n|--interval) n=$1; shift;;
+    -n*)           n=${a#-n};;
+    --interval=*)  n=${a#*=};;
+    -t|--no-title) title=0;;
+    -b|--beep)     beep=1;;
+    -e|--errexit)  exit_on_err=1;;
+    -d*|--differences*|-c|--color|-x|--exec|-p|--precise|-g|--chgexit) ;;
+    --) break;;
+  esac
+done
+typeset cmd="$*"
+(( $# )) || { _lc_err "watch: no command given"; exit 1 }
+
+trap 'tput cnorm 2>/dev/null; print; exit 0' INT TERM
+tput civis 2>/dev/null
+typeset out left right
+typeset -i rc pad
+while true; do
+  out=$(sh -c "$cmd" 2>&1)
+  rc=$?
+  print -n $'\e[H\e[2J'
+  if (( title )); then
+    left="Every ${n}s: $cmd"
+    right="$(hostname -s): $(date '+%a %b %e %H:%M:%S %Y')"
+    (( pad = $(tput cols 2>/dev/null || print 80) - $#left - $#right, pad < 1 && (pad = 1) ))
+    printf '%s%*s%s\n\n' "$left" $pad '' "$right"
+  fi
+  print -r -- "$out"
+  if (( rc )); then
+    (( beep )) && print -n $'\a'
+    (( exit_on_err )) && { tput cnorm 2>/dev/null; exit $rc }
+  fi
+  sleep $n
+done

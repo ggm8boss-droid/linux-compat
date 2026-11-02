@@ -1,0 +1,58 @@
+#!/bin/zsh
+# sha1sum, sha224sum, sha256sum, sha384sum, sha512sum, md5sum -> shasum / md5
+# (the installer links the other names to this file).
+source "${0:A:h:h}/lib/common.zsh"
+typeset tool=${0:t}
+_lc_exec_gnu $tool "$@"
+
+if [[ $tool == sha*sum ]]; then
+  typeset bits=${${tool#sha}%sum}
+  _lc_log "→ shasum -a $bits $*"
+  exec shasum -a $bits "$@"
+fi
+
+# md5sum: macOS md5 has a different output format and no -c.
+typeset a
+typeset -i check=0 quiet=0 silent=0 rc=0
+typeset -a files
+for a; do
+  case $a in
+    -c|--check) check=1;;
+    --quiet) quiet=1;;
+    --status) silent=1;;
+    -b|-t|--binary|--text|--tag|-w|--warn|--strict) ;;
+    *) files+=("$a");;
+  esac
+done
+(( $#files )) || files=(-)
+
+if (( check )); then
+  typeset f line want name got
+  for f in $files; do
+    for line in ${(f)"$( [[ $f == - ]] && cat || cat -- "$f" )"}; do
+      want=${line%% *}; name=${line#* }; name=${name# }; name=${name#\*}
+      got=$(md5 -q -- "$name" 2>/dev/null)
+      if [[ $got == $want ]]; then
+        (( quiet || silent )) || print -r -- "$name: OK"
+      else
+        (( silent )) || print -r -- "$name: FAILED"
+        rc=1
+      fi
+    done
+  done
+  exit $rc
+fi
+
+typeset f
+for f in $files; do
+  if [[ $f == - ]]; then
+    print -r -- "$(md5 -q)  -"
+  elif [[ -d $f ]]; then
+    _lc_err "md5sum: $f: Is a directory"; rc=1
+  elif [[ -r $f ]]; then
+    print -r -- "$(md5 -q -- "$f")  $f"
+  else
+    _lc_err "md5sum: $f: No such file or directory"; rc=1
+  fi
+done
+exit $rc

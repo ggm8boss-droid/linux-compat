@@ -1,0 +1,25 @@
+#!/bin/zsh
+# ss (socket statistics) -> lsof / netstat.
+source "${0:A:h:h}/lib/common.zsh"
+
+typeset flags= a
+for a; do
+  case $a in
+    --tcp) flags+=t;; --udp) flags+=u;; --listening) flags+=l;; --all) flags+=a;;
+    --summary) flags+=s;; --numeric|--processes) ;;
+    -[^-]*) flags+=${a#-};;
+  esac
+done
+
+typeset -a cmd
+if [[ $flags == *s* ]]; then
+  cmd=(netstat -s)
+else
+  cmd=(lsof -nP)
+  [[ $flags == *t* || $flags != *u* ]] && cmd+=(-iTCP)
+  if [[ $flags == *l* ]]; then cmd+=(-sTCP:LISTEN)
+  elif [[ $flags != *a* ]]; then cmd+=(-sTCP:ESTABLISHED); fi
+  [[ $flags == *u* || ( $flags != *t* && $flags == *a* ) ]] && cmd+=(-iUDP)
+fi
+_lc_log "→ ${(j: :)cmd}"
+exec "${cmd[@]}"

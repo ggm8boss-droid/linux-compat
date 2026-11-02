@@ -1,0 +1,39 @@
+#!/bin/zsh
+# shuf: shuffle lines (perl), for when coreutils isn't installed.
+source "${0:A:h:h}/lib/common.zsh"
+_lc_exec_gnu shuf "$@"
+
+typeset a n= range=
+typeset -i echo_mode=0 repeat=0
+typeset -a items
+while (( $# )); do
+  a=$1; shift
+  case $a in
+    -n|--head-count) n=$1; shift;;
+    -n*)             n=${a#-n};;
+    --head-count=*)  n=${a#*=};;
+    -i|--input-range) range=$1; shift;;
+    -i*)             range=${a#-i};;
+    --input-range=*) range=${a#*=};;
+    -e|--echo)       echo_mode=1;;
+    -r|--repeat)     repeat=1;;
+    *)               items+=("$a");;
+  esac
+done
+
+typeset prog='
+  my ($n, $rep) = (shift, shift);
+  my @l = <STDIN>;
+  if ($rep) { $n = 1e18 if $n eq ""; while (@l && $n-- > 0) { print $l[rand @l] } exit }
+  for (my $i = @l; --$i > 0;) { my $j = int rand($i + 1); @l[$i, $j] = @l[$j, $i] }
+  splice @l, $n if $n ne "" && $n < @l;
+  print @l;'
+if [[ -n $range ]]; then
+  seq ${range%-*} ${range#*-} | perl -e "$prog" -- "$n" $repeat
+elif (( echo_mode )); then
+  print -rl -- "${items[@]}" | perl -e "$prog" -- "$n" $repeat
+elif (( $#items )) && [[ $items[1] != - ]]; then
+  perl -e "$prog" -- "$n" $repeat < "$items[1]"
+else
+  perl -e "$prog" -- "$n" $repeat
+fi

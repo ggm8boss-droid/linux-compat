@@ -1,0 +1,26 @@
+#!/bin/zsh
+# xclip / xsel -> pbcopy / pbpaste
+source "${0:A:h:h}/lib/common.zsh"
+
+typeset a
+typeset -i out=0 in=0
+typeset -a files
+while (( $# )); do
+  a=$1; shift
+  case $a in
+    -o|-out|--output) out=1;;
+    -i|-in|--input)   in=1;;
+    -selection|-sel|-t|-target|-display|-loops) shift;;
+    -*) [[ ${0:t} == xsel && $a == -[^-]#o* ]] && out=1;;   # xsel -bo
+    *) files+=("$a");;
+  esac
+done
+# plain `xsel` at a terminal prints the clipboard
+[[ ${0:t} == xsel && -t 0 ]] && (( ! in && ! $#files )) && out=1
+if (( out )); then
+  _lc_log "→ pbpaste"; exec pbpaste
+elif (( $#files )); then
+  _lc_log "→ pbcopy < ${files[*]}"; cat -- "${files[@]}" | pbcopy
+else
+  _lc_log "→ pbcopy"; exec pbcopy
+fi

@@ -1,0 +1,12 @@
+#!/bin/zsh
+# lsusb / lspci -> system_profiler (the installer links lspci to this file).
+source "${0:A:h:h}/lib/common.zsh"
+if [[ ${0:t} == lspci ]]; then
+  _lc_log "→ system_profiler SPPCIDataType SPDisplaysDataType"
+  exec system_profiler SPPCIDataType SPDisplaysDataType
+fi
+typeset out
+out=$(system_profiler SPUSBDataType 2>/dev/null)
+[[ -n ${out//[[:space:]]/} ]] || out=$(system_profiler SPUSBHostDataType 2>/dev/null)   # macOS 15+
+_lc_log "→ system_profiler SPUSBDataType"
+print -r -- "$out"

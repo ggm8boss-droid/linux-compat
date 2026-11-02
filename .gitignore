@@ -1,0 +1,17 @@
+# Runtime state (debug / disabled / gnu-everywhere flags)
+state/
+
+# Packaged releases
+*.tar.gz
+*.zip
+
+# Editor / OS clutter
+.DS_Store
+._*
+*.swp
+*~
+.vscode/
+.idea/
+
+# zsh completion cache from running the tests
+.zcompdump*

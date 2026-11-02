@@ -1,0 +1,29 @@
+#!/bin/zsh
+# lsb_release -> sw_vers
+source "${0:A:h:h}/lib/common.zsh"
+setopt extended_glob
+
+typeset ver=$(sw_vers -productVersion) code
+case ${ver%%.*} in
+  11) code=bigsur;; 12) code=monterey;; 13) code=ventura;; 14) code=sonoma;;
+  15) code=sequoia;; 26) code=tahoe;; *) code=n/a;;
+esac
+typeset -i short=0 all=0 i=0 d=0 r=0 c=0
+typeset a
+for a; do
+  case $a in
+    -s|--short) short=1;;
+    -a|--all) all=1;;
+    -i|--id) i=1;; -d|--description) d=1;; -r|--release) r=1;; -c|--codename) c=1;;
+    -[a-z]##) [[ $a == *s* ]] && short=1; [[ $a == *a* ]] && all=1; [[ $a == *i* ]] && i=1
+              [[ $a == *d* ]] && d=1; [[ $a == *r* ]] && r=1; [[ $a == *c* ]] && c=1;;
+  esac
+done
+(( all )) && i=1 d=1 r=1 c=1
+(( i + d + r + c )) || d=1
+out() { if (( short )); then print -r -- "$2"; else print -r -- "$1:	$2"; fi }
+(( i )) && out "Distributor ID" macOS
+(( d )) && out Description "macOS $ver"
+(( r )) && out Release "$ver"
+(( c )) && out Codename "$code"
+true

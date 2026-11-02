@@ -1,0 +1,5 @@
+#!/bin/zsh
+# poweroff -> shutdown -h now
+source "${0:A:h:h}/lib/common.zsh"
+_lc_log "→ shutdown -h now"
+if (( EUID == 0 )); then exec shutdown -h now; else exec sudo shutdown -h now; fi

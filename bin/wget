@@ -1,0 +1,57 @@
+#!/bin/zsh
+# wget -> curl (used only until `brew install wget`).
+source "${0:A:h:h}/lib/common.zsh"
+
+typeset a out= dir=
+typeset -i quiet=0
+typeset -a opts urls
+while (( $# )); do
+  a=$1; shift
+  case $a in
+    -O|--output-document)   out=$1; shift;;
+    -O*)                    out=${a#-O};;
+    --output-document=*)    out=${a#*=};;
+    -P|--directory-prefix)  dir=$1; shift;;
+    --directory-prefix=*)   dir=${a#*=};;
+    -q|--quiet|-nv|--no-verbose) quiet=1;;
+    -c|--continue)          opts+=(-C -);;
+    --no-check-certificate) opts+=(-k);;
+    -U|--user-agent)        opts+=(-A "$1"); shift;;
+    --user-agent=*)         opts+=(-A "${a#*=}");;
+    --header)               opts+=(-H "$1"); shift;;
+    --header=*)             opts+=(-H "${a#*=}");;
+    --user=*)               opts+=(-u "${a#*=}");;
+    --post-data=*)          opts+=(--data "${a#*=}");;
+    --post-file=*)          opts+=(--data-binary "@${a#*=}");;
+    -T|--timeout)           opts+=(--max-time "$1"); shift;;
+    --timeout=*)            opts+=(--max-time "${a#*=}");;
+    -t|--tries)             opts+=(--retry "$1"); shift;;
+    --tries=*)              opts+=(--retry "${a#*=}");;
+    -i|--input-file)        urls+=(${(f)"$(<$1)"}); shift;;
+    -r|--recursive|-m|--mirror|-np|--no-parent|-k|--convert-links|-p|--page-requisites)
+      _lc_err "wget: recursive downloads need the real wget: brew install wget"; exit 1;;
+    -*) ;;
+    *) urls+=("$a");;
+  esac
+done
+(( $#urls )) || { _lc_err "wget: missing URL"; exit 1 }
+
+typeset -a cmd=(curl -fL $opts)
+(( quiet )) && cmd+=(-sS)
+[[ -n $dir ]] && cmd+=(--create-dirs --output-dir "$dir")
+typeset u name p
+typeset -i rc=0
+for u in $urls; do
+  if [[ $out == - ]]; then
+    "${cmd[@]}" -s -- "$u" || rc=$?
+    continue
+  fi
+  p=${${u#*://}%%[?#]*}
+  if [[ -n $out ]]; then name=$out
+  elif [[ $p != */* || $p == */ ]]; then name=index.html
+  else name=${p##*/}; fi
+  (( quiet )) || print -ru2 -- "Saving to: '$name'"
+  _lc_log "→ ${(j: :)cmd} -o $name $u"
+  "${cmd[@]}" -o "$name" -- "$u" || rc=$?
+done
+exit $rc

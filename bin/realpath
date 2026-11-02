@@ -1,0 +1,6 @@
+#!/bin/zsh
+# realpath for macOS before 13 (newer macOS has its own, which wins on PATH).
+source "${0:A:h:h}/lib/common.zsh"
+_lc_exec_gnu realpath "$@"
+typeset -a files=(${@:#-*})
+exec perl -MCwd=abs_path -le 'my $rc = 0; for (@ARGV) { my $p = abs_path($_); if (defined $p) { print $p } else { warn "realpath: $_: No such file or directory\n"; $rc = 1 } } exit $rc' -- "${files[@]}"

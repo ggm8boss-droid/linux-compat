@@ -1,0 +1,13 @@
+#!/bin/zsh
+# tac: print lines in reverse (tail -r on macOS).
+source "${0:A:h:h}/lib/common.zsh"
+_lc_exec_gnu tac "$@"
+
+typeset f
+typeset -i rc=0
+(( $# )) || set -- -
+for f; do
+  if [[ $f == - ]]; then tail -r || rc=1
+  else tail -r -- "$f" || rc=1; fi
+done
+exit $rc

@@ -1,0 +1,6 @@
+#!/bin/zsh
+# ldd -> otool -L
+source "${0:A:h:h}/lib/common.zsh"
+typeset -a files=(${@:#-*})
+_lc_log "→ otool -L $files"
+exec otool -L "${files[@]}"

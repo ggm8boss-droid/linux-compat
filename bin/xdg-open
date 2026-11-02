@@ -1,0 +1,6 @@
+#!/bin/zsh
+# xdg-open / gnome-open / nautilus -> open
+source "${0:A:h:h}/lib/common.zsh"
+(( $# )) || set -- .
+_lc_log "→ open $*"
+exec open "$@"

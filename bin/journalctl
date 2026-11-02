@@ -1,0 +1,60 @@
+#!/bin/zsh
+# journalctl -> macOS unified log (log show / log stream), or a brew service's log file.
+source "${0:A:h:h}/lib/common.zsh"
+setopt extended_glob
+
+typeset unit= n= since= a
+typeset -i follow=0 kernel=0 boot=0
+while (( $# )); do
+  a=$1; shift
+  case $a in
+    -u|--unit)  unit=${1%.service}; shift;;
+    --unit=*)   unit=${${a#*=}%.service};;
+    -u*)        unit=${${a#-u}%.service};;
+    -f|--follow) follow=1;;
+    -n|--lines) n=$1; shift;;
+    --lines=*)  n=${a#*=};;
+    -n*)        n=${a#-n};;
+    -S|--since) since=$1; shift;;
+    --since=*)  since=${a#*=};;
+    -k|--dmesg) kernel=1;;
+    -b|--boot)  boot=1;;
+    -[^-]#f[^-]#) follow=1;;                  # e.g. -xef
+    *) ;;
+  esac
+done
+
+if [[ -n $unit ]]; then
+  typeset -a logs
+  [[ -n $HOMEBREW_PREFIX ]] && logs=($HOMEBREW_PREFIX/var/log/${unit}*(N.) $HOMEBREW_PREFIX/var/log/${unit}*/*(N.))
+  if (( $#logs )); then
+    if (( follow )); then exec tail -n ${n:-10} -f $logs; else exec tail -n ${n:-50} $logs; fi
+  fi
+fi
+
+typeset -a cmd pred
+(( kernel )) && pred=(--predicate 'process == "kernel"')
+[[ -n $unit ]] && pred=(--predicate "process CONTAINS[c] \"$unit\"")
+
+if (( follow )); then
+  cmd=(log stream --style syslog $pred)
+else
+  cmd=(log show --style syslog $pred)
+  if (( boot )); then
+    cmd+=(--last boot)
+  elif [[ -n $since ]]; then
+    case ${(L)since} in
+      today)     cmd+=(--start "$(date +%Y-%m-%d) 00:00:00");;
+      yesterday) cmd+=(--start "$(date -v-1d +%Y-%m-%d) 00:00:00");;
+      (#b)([0-9]##)\ #(s|sec|second|m|min|minute|h|hour|d|day)(s|)\ #ago)
+        cmd+=(--last $match[1]${match[2][1]});;
+      (#b)-([0-9]##)([smhd]))
+        cmd+=(--last $match[1]$match[2]);;
+      *) cmd+=(--start "$since");;
+    esac
+  else
+    cmd+=(--last 1h)
+  fi
+fi
+_lc_log "→ ${(j: :)${(@q-)cmd}}${n:+ | tail -n $n}"
+if [[ -n $n ]]; then command "${cmd[@]}" | tail -n $n; else command "${cmd[@]}"; fi

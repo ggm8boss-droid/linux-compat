@@ -1,0 +1,6 @@
+#!/bin/zsh
+# apt, apt-get, apt-cache, aptitude, dpkg, yum, dnf, pacman, zypper, apk, snap -> Homebrew.
+# The installer links all of those names to this file.
+source "${0:A:h:h}/lib/common.zsh"
+source "$LC_HOME/lib/pkg.zsh"
+_lc_pkg ${0:t} "$@"

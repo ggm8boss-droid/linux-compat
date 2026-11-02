@@ -1,0 +1,22 @@
+#!/bin/zsh
+# hostnamectl -> scutil
+source "${0:A:h:h}/lib/common.zsh"
+
+case $1 in
+  set-hostname|hostname)
+    if [[ -n $2 ]]; then
+      _lc_log "→ scutil --set HostName/LocalHostName/ComputerName $2"
+      sudo scutil --set HostName "$2" && sudo scutil --set LocalHostName "${2//[^A-Za-z0-9-]/-}" && sudo scutil --set ComputerName "$2"
+    else
+      scutil --get HostName 2>/dev/null || hostname
+    fi;;
+  ''|status)
+    printf '%18s: %s\n' "Static hostname" "$(scutil --get LocalHostName 2>/dev/null)"
+    printf '%18s: %s\n' "Pretty hostname" "$(scutil --get ComputerName 2>/dev/null)"
+    printf '%18s: %s\n' "Transient hostname" "$(hostname)"
+    printf '%18s: %s\n' "Chassis" "$(sysctl -n hw.model)"
+    printf '%18s: %s\n' "Operating System" "macOS $(sw_vers -productVersion)"
+    printf '%18s: %s\n' "Kernel" "$(uname -sr)"
+    printf '%18s: %s\n' "Architecture" "$(uname -m)";;
+  *) _lc_err "Unknown command verb $1."; exit 1;;
+esac

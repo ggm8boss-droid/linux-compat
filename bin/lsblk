@@ -1,0 +1,38 @@
+#!/bin/zsh
+# lsblk: block devices in the Linux layout, from diskutil list + mount.
+source "${0:A:h:h}/lib/common.zsh"
+setopt extended_glob
+
+typeset -A mnt
+typeset line dev
+for line in ${(f)"$(mount)"}; do
+  [[ $line == (#b)/dev/(disk[0-9s]##)\ on\ (*)\ \(* ]] && mnt[$match[1]]=$match[2]
+done
+
+typeset -a name size type mp desc
+typeset -i parsed=0
+for line in ${(f)"$(diskutil list)"}; do
+  # "   1:   Apple_APFS Container disk3   494.4 GB   disk0s2"
+  if [[ $line =~ '^ +([0-9]+): +(.*[^ ]) +[*+]?([0-9.]+) ([KMGTP]?B) +(disk[0-9]+(s[0-9]+)*)$' ]]; then
+    dev=$match[5]
+    name+=($dev); size+=($match[3]${match[4]%B})
+    [[ $match[1] == 0 ]] && type+=(disk) || type+=(part)
+    mp+=("${mnt[$dev]}"); desc+=("${match[2]//  ##/ }")
+    parsed=1
+  fi
+done
+if (( ! parsed )); then exec diskutil list; fi
+
+typeset -i i
+typeset prefix
+printf '%-16s %7s %-5s %-28s %s\n' NAME SIZE TYPE MOUNTPOINTS DESCRIPTION
+for (( i = 1; i <= $#name; i++ )); do
+  if [[ $type[i] == disk ]]; then
+    prefix=
+  elif [[ $type[i+1] == part ]]; then
+    prefix='├─'
+  else
+    prefix='└─'
+  fi
+  printf '%-16s %7s %-5s %-28s %s\n' "$prefix$name[i]" "$size[i]" "$type[i]" "$mp[i]" "$desc[i]"
+done
