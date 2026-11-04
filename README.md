@@ -5,6 +5,21 @@ Type Linux/bash commands in the macOS Terminal and they just work: `apt install`
 `read -p`, `${var,,}`... It runs inside zsh (the default Mac shell). Nothing is printed
 unless you turn debug on.
 
+## Try it first (nothing is installed)
+
+```sh
+cd ~/Downloads/LinuxCompat      # wherever the folder is
+sh try.sh
+```
+
+This opens a test shell with linux-compat loaded and your normal zsh setup, with a yellow
+`[linux-compat test]` in front of the prompt. Type `exit` to go back. Nothing outside the
+folder is created or changed: `~/.zshrc` is read but never edited, and the test shell
+keeps its own history inside the folder. Use `sh try.sh --clean` to leave your `~/.zshrc`
+out too. To undo it completely, delete the folder.
+
+Run `linuxcompat test` in the test shell and send back the output.
+
 ## Install
 
 1. Copy the `LinuxCompat` folder to the Mac (zip, AirDrop, USB...).

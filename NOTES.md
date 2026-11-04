@@ -23,6 +23,17 @@ on a Mac by me; the user's friend tests it (`linuxcompat test`, then `linuxcompa
 - `bin/` Linux-only commands, appended to PATH. Multi-name scripts use `${0:t}`; the installer makes
   the symlinks (apt-get -> apt, service -> systemctl, md5sum -> sha256sum, ...).
 
+## Test mode (try.sh), added 2026-11-04
+- The friend didn't want ~/.zshrc touched. `sh try.sh` runs `zsh -i` with `ZDOTDIR=<folder>/try`.
+  `try/.zshenv` and `try/.zshrc` source the user's real files (read only), set HISTFILE inside
+  the folder, source linux-compat.zsh, restore ZDOTDIR for child processes, and add a yellow
+  prompt marker in precmd. `--clean` skips the user's .zshrc.
+- try.sh makes the bin/ symlinks in the folder itself (listed in .gitignore). `LC_TRY=1` makes
+  `linuxcompat uninstall` refuse to run and `status` say "test shell".
+- Banner printed by try.sh, not .zshrc (p10k instant prompt complains about output during init).
+- Docker check: fake HOME snapshot (ls --full-time + md5) identical before/after; user alias,
+  prompt and .zshenv were loaded; --clean drops them; folder path with a space works.
+
 ## Gotchas
 - Never `local x` twice in one function without a value: zsh prints the existing value.
 - `status` is read-only in zsh (alias of `$?`); don't use it as a variable.

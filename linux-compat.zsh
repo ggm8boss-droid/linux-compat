@@ -34,7 +34,7 @@ linuxcompat() {
     off) : >| $LC_STATE/disabled; print "linux-compat: disabled for new shells (\`linuxcompat on\` to re-enable)";;
     on)  rm -f $LC_STATE/disabled; print "linux-compat: enabled for new shells";;
     status)
-      print "linux-compat $LC_VERSION ($LC_HOME)"
+      print "linux-compat $LC_VERSION ($LC_HOME)${LC_TRY:+  [test shell, not installed]}"
       print "  enabled:        $([[ -e $LC_STATE/disabled ]] && print no || print yes)"
       print "  debug:          $(_lc_debug_on && print on || print off)"
       print "  gnu-everywhere: $([[ -e $LC_STATE/gnu-everywhere ]] && print on || print off)"
@@ -47,7 +47,12 @@ linuxcompat() {
       (( $#miss )) && print "  BSD fallback:   $miss  (\`linuxcompat install-gnu\` for exact GNU behaviour)"
       ;;
     test) zsh $LC_HOME/tests/run-tests.zsh "${@:2}";;
-    uninstall) zsh $LC_HOME/uninstall.sh;;
+    uninstall)
+      if [[ -n $LC_TRY ]]; then
+        print "linux-compat: this is the test shell, nothing is installed. Type exit, then delete the folder."
+      else
+        zsh $LC_HOME/uninstall.sh
+      fi;;
     *)
       print "usage: linuxcompat status | debug on|off | gnu-everywhere on|off | install-gnu | on | off | test | uninstall";;
   esac
