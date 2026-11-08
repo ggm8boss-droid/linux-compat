@@ -38,6 +38,9 @@ on a Mac by me; the user's friend tests it (`linuxcompat test`, then `linuxcompa
 - Never `local x` twice in one function without a value: zsh prints the existing value.
 - `status` is read-only in zsh (alias of `$?`); don't use it as a variable.
 - `emulate -L zsh` in `shopt` would undo its own setopt, so shopt has none.
+- Unquoted `$(...)` inside a nested `${${...}#pat}` is word-split into an array. `uptime -p` broke on
+  the friend's Mac that way (2026-11-08, `kern.boottime` = `{ sec = N, usec = M } date`): keep command
+  output in a quoted scalar first. Now covered by a fake-sysctl test.
 - Prompts containing `%` are zsh prompts (p10k, omz) and are never converted.
 
 ## Testing

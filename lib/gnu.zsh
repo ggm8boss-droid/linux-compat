@@ -765,7 +765,11 @@ _lc_tr_uptime() {
 _lc_impl_uptime() {
   emulate -L zsh
   zmodload -F zsh/datetime p:EPOCHSECONDS
-  local bt=${${$(command sysctl -n kern.boottime)#*sec = }%%,*}
+  # kern.boottime prints "{ sec = 1730000000, usec = 123 } Mon Nov  4 ...". Keep it one string:
+  # an unquoted $(...) is split into words and the "sec = " strip never matches.
+  local raw="$(command sysctl -n kern.boottime 2>/dev/null)"
+  local bt=${${raw#*sec = }%%,*}
+  [[ $bt == <-> ]] || { command uptime; return 1 }
   local -i up=$(( EPOCHSECONDS - bt )) w d h m
   local -a parts
   if [[ $1 == s ]]; then

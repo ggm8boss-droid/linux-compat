@@ -133,6 +133,14 @@ t_translations() {
   tr_is hostname -I                      :: _lc_impl_ips
   tr_is hostname                         :: hostname
   tr_is uptime -p                        :: _lc_impl_uptime p
+  # ...and the implementation, against a fake macOS sysctl (kern.boottime has spaces and braces)
+  local ftmp=$(command mktemp -d)
+  zmodload -F zsh/datetime p:EPOCHSECONDS
+  print -r -- "#!/bin/sh
+echo '{ sec = $(( EPOCHSECONDS - 93930 )), usec = 123456 } Mon Nov  4 09:12:33 2026'" > $ftmp/sysctl
+  chmod +x $ftmp/sysctl
+  same 'uptime -p (fake sysctl)' "$(PATH=$ftmp:$PATH _lc_impl_uptime p 2>&1)" 'up 1 day, 2 hours, 5 minutes'
+  command rm -rf $ftmp
   tr_is zcat a.gz                        :: gzip -dc a.gz
 
   print "translations (GNU tools installed)"
