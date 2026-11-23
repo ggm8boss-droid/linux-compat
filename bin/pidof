@@ -1,10 +1,16 @@
 #!/bin/zsh
-# pidof NAME...: PIDs on one line.
+# pidof NAME...: PIDs of running processes by name, one line, highest PID first
+# (like Linux pidof).  -s one PID only;  -o PID[,PID...] omit these.
+#
+# Matches the executable's basename, ignoring a login shell's leading '-'
+# (macOS lists a login shell's command as "-zsh").  Reads the process list with
+# the system `ps`, not `pgrep`: a GNU `pgrep` (procps, e.g. from Homebrew) on
+# PATH tries to read /proc, which macOS doesn't have, and finds nothing.
 source "${0:A:h:h}/lib/common.zsh"
 
 typeset a
 typeset -i single=0
-typeset -a pids omit names
+typeset -a omit names pids
 while (( $# )); do
   a=$1; shift
   case $a in
@@ -15,11 +21,18 @@ while (( $# )); do
     *) names+=("$a");;
   esac
 done
-for a in $names; do
-  pids+=(${(f)"$(pgrep -x -- "$a")"})
-done
+(( $#names )) || exit 1
+
+typeset pid rest cmd base
+while read -r pid rest; do
+  cmd=${rest%% *}      # the executable, without any arguments
+  base=${cmd:t}        # its basename (handles "/bin/zsh")
+  base=${base#-}       # a login shell shows as "-zsh"
+  (( ${names[(Ie)$base]} )) && pids+=($pid)
+done < <(command ps -axo pid=,comm= 2>/dev/null)
+
 pids=(${pids:|omit})
-pids=(${(On)pids})
+pids=(${(Onu)pids})    # highest first, numeric, unique
 (( $#pids )) || exit 1
 (( single )) && pids=($pids[1])
 print -r -- "${(j: :)pids}"
