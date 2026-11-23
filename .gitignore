@@ -1,6 +1,31 @@
 # Runtime state (debug / disabled / gnu-everywhere flags)
 state/
 
+# Created by try.sh: test-shell history/caches and the extra command names
+try/.zsh_history
+try/.zcompdump*
+try/.zsh_sessions/
+bin/apt-get
+bin/apt-cache
+bin/aptitude
+bin/dpkg
+bin/yum
+bin/dnf
+bin/pacman
+bin/zypper
+bin/apk
+bin/snap
+bin/service
+bin/gnome-open
+bin/nautilus
+bin/xsel
+bin/sha1sum
+bin/sha224sum
+bin/sha384sum
+bin/sha512sum
+bin/md5sum
+bin/lspci
+
 # Packaged releases
 *.tar.gz
 *.zip

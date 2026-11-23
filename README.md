@@ -5,6 +5,21 @@ Type Linux/bash commands in the macOS Terminal and they just work: `apt install`
 `read -p`, `${var,,}`... It runs inside zsh (the default Mac shell). Nothing is printed
 unless you turn debug on.
 
+## Try it first (nothing is installed)
+
+```sh
+cd ~/Downloads/LinuxCompat      # wherever the folder is
+sh try.sh
+```
+
+This opens a test shell with linux-compat loaded and your normal zsh setup, with a yellow
+`[linux-compat test]` in front of the prompt. Type `exit` to go back. Nothing outside the
+folder is created or changed: `~/.zshrc` is read but never edited, and the test shell
+keeps its own history inside the folder. Use `sh try.sh --clean` to leave your `~/.zshrc`
+out too. To undo it completely, delete the folder.
+
+Run `linuxcompat test` in the test shell and send back the output.
+
 ## Install
 
 1. Copy the `LinuxCompat` folder to the Mac (zip, AirDrop, USB...).
@@ -33,6 +48,7 @@ Everything lives in `~/.linux-compat`, plus three lines at the end of `~/.zshrc`
 | `linuxcompat test` | self-test (send the output if something's wrong) |
 | `linuxcompat install-gnu` | install the GNU tools later |
 | `linuxcompat gnu-everywhere on` | also give GNU tools to every program and script, not just what you type |
+| `linuxcompat prompt auto` / `on` / `off` | Git Bash style prompt: `user@host MINGW64 ~/path (branch)`, then `$ ` on the next line. `auto` (default) only replaces the stock macOS prompt, so oh-my-zsh / powerlevel10k / your own `PROMPT` stay; `on` forces it over themes too. Set `LC_PROMPT_TAG` to change the purple word |
 | `linuxcompat off` / `on` | disable / re-enable for new tabs |
 | `linuxcompat uninstall` | remove it (keeps a backup of `.zshrc`) |
 

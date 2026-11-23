@@ -20,13 +20,34 @@ on a Mac by me; the user's friend tests it (`linuxcompat test`, then `linuxcompa
   hit "defining function based on alias".
 - `lib/datetr.zsh` GNU `date -d` strings -> BSD `-j -f` / `-v` / `-r`.
 - `lib/bashcompat.zsh` options, read/shopt/mapfile/history, PS1, accept-line rewrite of `${x,,}` etc.
+- `lib/prompt.zsh` (2026-11-23, user asked for WinLinuxCompat's Git Bash look): same prompt as
+  `..\WinLinuxCompat\lib\prompt.ps1`, incl. "MINGW64:/path" window title and |REBASE/|MERGING etc.
+  Reads .git itself. Branch goes via `psvar[9]` / `%9v` so PROMPT is static and a branch named
+  `$(cmd)` can't run under PROMPT_SUBST. Modes: auto (default, only over the stock macOS/zsh prompt,
+  so omz/p10k users keep theirs), `prompt on` = state/prompt-on (reasserted in precmd, clears
+  RPROMPT), `prompt off` = state/noprompt (not sourced). Sourced after bashcompat so its precmd runs
+  after `_lc_precmd`. MINGW64 kept on purpose for the identical look; `LC_PROMPT_TAG` overrides.
 - `bin/` Linux-only commands, appended to PATH. Multi-name scripts use `${0:t}`; the installer makes
   the symlinks (apt-get -> apt, service -> systemctl, md5sum -> sha256sum, ...).
+
+## Test mode (try.sh), added 2026-11-04
+- The friend didn't want ~/.zshrc touched. `sh try.sh` runs `zsh -i` with `ZDOTDIR=<folder>/try`.
+  `try/.zshenv` and `try/.zshrc` source the user's real files (read only), set HISTFILE inside
+  the folder, source linux-compat.zsh, restore ZDOTDIR for child processes, and add a yellow
+  prompt marker in precmd. `--clean` skips the user's .zshrc.
+- try.sh makes the bin/ symlinks in the folder itself (listed in .gitignore). `LC_TRY=1` makes
+  `linuxcompat uninstall` refuse to run and `status` say "test shell".
+- Banner printed by try.sh, not .zshrc (p10k instant prompt complains about output during init).
+- Docker check: fake HOME snapshot (ls --full-time + md5) identical before/after; user alias,
+  prompt and .zshenv were loaded; --clean drops them; folder path with a space works.
 
 ## Gotchas
 - Never `local x` twice in one function without a value: zsh prints the existing value.
 - `status` is read-only in zsh (alias of `$?`); don't use it as a variable.
 - `emulate -L zsh` in `shopt` would undo its own setopt, so shopt has none.
+- Unquoted `$(...)` inside a nested `${${...}#pat}` is word-split into an array. `uptime -p` broke on
+  the friend's Mac that way (2026-11-08, `kern.boottime` = `{ sec = N, usec = M } date`): keep command
+  output in a quoted scalar first. Now covered by a fake-sysctl test.
 - Prompts containing `%` are zsh prompts (p10k, omz) and are never converted.
 
 ## Testing
@@ -39,4 +60,9 @@ on a Mac by me; the user's friend tests it (`linuxcompat test`, then `linuxcompa
   a fake `uname` printing Darwin. The macOS live tests have NOT run yet; that's the friend's job.
 - Bug found that way: `_lc_build` returned its last `[[ ]] &&` status, so wrappers silently did nothing.
   Now `reply` empty = failure, and tr_is checks the status.
+- 2026-11-23: 138/138 pass (12 new prompt tests). Rendered prompt checked with print -P in Docker.
+  Real macOS Terminal look (title, colours) not seen yet.
+- Branches: `main` = initial commit only; `testBranch` = try.sh + uptime fix (pushed, not merged);
+  `addGitUI` = testBranch + the prompt (2026-11-23). core.autocrlf=true: the working tree is CRLF
+  after a checkout, so the tarball is built from an LF copy (zsh can't run CRLF scripts).
 - Package for the friend: `..\LinuxCompat-1.0.0.tar.gz` (rebuild with tar --exclude=state).

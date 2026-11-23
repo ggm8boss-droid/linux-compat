@@ -28,6 +28,7 @@ mkdir -p "$DEST/state"
 if [ "$SRC" != "$DEST" ]; then
   for d in bin lib tests; do rm -rf "$DEST/$d"; cp -R "$SRC/$d" "$DEST/$d"; done
   cp "$SRC/linux-compat.zsh" "$SRC/uninstall.sh" "$SRC/README.md" "$DEST/"
+  rm -rf "$DEST/try"; cp -R "$SRC/try" "$DEST/try"; cp "$SRC/try.sh" "$DEST/"
 fi
 chmod +x "$DEST"/bin/*
 
