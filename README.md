@@ -48,6 +48,7 @@ Everything lives in `~/.linux-compat`, plus three lines at the end of `~/.zshrc`
 | `linuxcompat test` | self-test (send the output if something's wrong) |
 | `linuxcompat install-gnu` | install the GNU tools later |
 | `linuxcompat gnu-everywhere on` | also give GNU tools to every program and script, not just what you type |
+| `linuxcompat prompt auto` / `on` / `off` | Git Bash style prompt: `user@host MINGW64 ~/path (branch)`, then `$ ` on the next line. `auto` (default) only replaces the stock macOS prompt, so oh-my-zsh / powerlevel10k / your own `PROMPT` stay; `on` forces it over themes too. Set `LC_PROMPT_TAG` to change the purple word |
 | `linuxcompat off` / `on` | disable / re-enable for new tabs |
 | `linuxcompat uninstall` | remove it (keeps a backup of `.zshrc`) |
 

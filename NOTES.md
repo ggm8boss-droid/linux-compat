@@ -20,6 +20,13 @@ on a Mac by me; the user's friend tests it (`linuxcompat test`, then `linuxcompa
   hit "defining function based on alias".
 - `lib/datetr.zsh` GNU `date -d` strings -> BSD `-j -f` / `-v` / `-r`.
 - `lib/bashcompat.zsh` options, read/shopt/mapfile/history, PS1, accept-line rewrite of `${x,,}` etc.
+- `lib/prompt.zsh` (2026-11-23, user asked for WinLinuxCompat's Git Bash look): same prompt as
+  `..\WinLinuxCompat\lib\prompt.ps1`, incl. "MINGW64:/path" window title and |REBASE/|MERGING etc.
+  Reads .git itself. Branch goes via `psvar[9]` / `%9v` so PROMPT is static and a branch named
+  `$(cmd)` can't run under PROMPT_SUBST. Modes: auto (default, only over the stock macOS/zsh prompt,
+  so omz/p10k users keep theirs), `prompt on` = state/prompt-on (reasserted in precmd, clears
+  RPROMPT), `prompt off` = state/noprompt (not sourced). Sourced after bashcompat so its precmd runs
+  after `_lc_precmd`. MINGW64 kept on purpose for the identical look; `LC_PROMPT_TAG` overrides.
 - `bin/` Linux-only commands, appended to PATH. Multi-name scripts use `${0:t}`; the installer makes
   the symlinks (apt-get -> apt, service -> systemctl, md5sum -> sha256sum, ...).
 
@@ -53,4 +60,9 @@ on a Mac by me; the user's friend tests it (`linuxcompat test`, then `linuxcompa
   a fake `uname` printing Darwin. The macOS live tests have NOT run yet; that's the friend's job.
 - Bug found that way: `_lc_build` returned its last `[[ ]] &&` status, so wrappers silently did nothing.
   Now `reply` empty = failure, and tr_is checks the status.
+- 2026-11-23: 138/138 pass (12 new prompt tests). Rendered prompt checked with print -P in Docker.
+  Real macOS Terminal look (title, colours) not seen yet.
+- Branches: `main` = initial commit only; `testBranch` = try.sh + uptime fix (pushed, not merged);
+  `addGitUI` = testBranch + the prompt (2026-11-23). core.autocrlf=true: the working tree is CRLF
+  after a checkout, so the tarball is built from an LF copy (zsh can't run CRLF scripts).
 - Package for the friend: `..\LinuxCompat-1.0.0.tar.gz` (rebuild with tar --exclude=state).

@@ -13,6 +13,12 @@ if [[ -x $HOMEBREW_PREFIX/bin/brew ]] && (( ! $+commands[brew] )); then
   eval "$($HOMEBREW_PREFIX/bin/brew shellenv)"
 fi
 
+_lc_prompt_mode() {
+  if [[ -e $LC_STATE/noprompt ]]; then print off
+  elif [[ -e $LC_STATE/prompt-on ]]; then print on
+  else print auto; fi
+}
+
 linuxcompat() {
   emulate -L zsh
   local f
@@ -29,6 +35,16 @@ linuxcompat() {
         off) rm -f $LC_STATE/gnu-everywhere; print "linux-compat: GNU tools only in this shell (open a new tab)";;
         *)   [[ -e $LC_STATE/gnu-everywhere ]] && print on || print off;;
       esac;;
+    prompt)
+      case $2 in
+        on)   rm -f $LC_STATE/noprompt; : >| $LC_STATE/prompt-on
+              print "linux-compat: Git Bash style prompt always on, even over oh-my-zsh/p10k themes (new tabs)";;
+        auto) rm -f $LC_STATE/noprompt $LC_STATE/prompt-on
+              print "linux-compat: Git Bash style prompt only when the prompt is the stock one (new tabs)";;
+        off)  rm -f $LC_STATE/prompt-on; : >| $LC_STATE/noprompt
+              print "linux-compat: prompt off, new tabs keep their normal prompt";;
+        *)    _lc_prompt_mode;;
+      esac;;
     install-gnu)
       _lc_brew install coreutils gnu-sed grep findutils gnu-tar gawk bash wget watch;;
     off) : >| $LC_STATE/disabled; print "linux-compat: disabled for new shells (\`linuxcompat on\` to re-enable)";;
@@ -38,6 +54,7 @@ linuxcompat() {
       print "  enabled:        $([[ -e $LC_STATE/disabled ]] && print no || print yes)"
       print "  debug:          $(_lc_debug_on && print on || print off)"
       print "  gnu-everywhere: $([[ -e $LC_STATE/gnu-everywhere ]] && print on || print off)"
+      print "  prompt:         $(_lc_prompt_mode)"
       print "  homebrew:       ${HOMEBREW_PREFIX:-not installed}"
       local -a have miss
       for f in sed grep date stat readlink find xargs tar awk ls; do
@@ -54,7 +71,7 @@ linuxcompat() {
         zsh $LC_HOME/uninstall.sh
       fi;;
     *)
-      print "usage: linuxcompat status | debug on|off | gnu-everywhere on|off | install-gnu | on | off | test | uninstall";;
+      print "usage: linuxcompat status | debug on|off | gnu-everywhere on|off | prompt on|auto|off | install-gnu | on | off | test | uninstall";;
   esac
 }
 
@@ -71,3 +88,4 @@ fi
 source $LC_HOME/lib/datetr.zsh
 source $LC_HOME/lib/gnu.zsh
 source $LC_HOME/lib/bashcompat.zsh
+[[ -e $LC_STATE/noprompt ]] || source $LC_HOME/lib/prompt.zsh

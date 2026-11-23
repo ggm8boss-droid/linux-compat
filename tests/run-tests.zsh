@@ -239,6 +239,37 @@ t_bashcompat_inner() {    # runs inside `zsh -f -i`
   _lc_ps1_from_bash '\[\e[32m\]\W\[\e[0m\] '
   same 'PS1 colours' "$REPLY" $'%{\e[32m%}%1~%{\e[0m%} '
 
+  # Git Bash style prompt (zsh -f starts with the stock '%m%# ', so auto mode takes over)
+  same 'git bash prompt replaces the stock prompt' "$PROMPT" "$_lc_prompt"
+  _lc_prompt_is_stock '%n@%m %1~ %# ' && ok 'macOS stock prompt detected' || bad 'macOS stock prompt detected'
+  ( PROMPT='%F{red}mine%f> '; _lc_prompt_is_stock ) && bad 'custom prompt kept in auto mode' || ok 'custom prompt kept in auto mode'
+  local g=$(mktemp -d)
+  mkdir -p $g/repo/.git $g/repo/sub/deeper $g/wt $g/wtgit
+  print 'ref: refs/heads/main' > $g/repo/.git/HEAD
+  _lc_git_head $g/repo/sub/deeper;  same 'prompt branch from a subdir' "$REPLY" main
+  _lc_git_head $g;                  same 'prompt outside a repo' "$REPLY" ''
+  : > $g/repo/.git/MERGE_HEAD
+  _lc_git_head $g/repo;             same 'prompt while merging' "$REPLY" 'main|MERGING'
+  rm $g/repo/.git/MERGE_HEAD; mkdir -p $g/repo/.git/rebase-merge
+  print 'refs/heads/feature' > $g/repo/.git/rebase-merge/head-name
+  print 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b > $g/repo/.git/HEAD
+  _lc_git_head $g/repo;             same 'prompt while rebasing' "$REPLY" 'feature|REBASE'
+  rm -rf $g/repo/.git/rebase-merge
+  _lc_git_head $g/repo;             same 'prompt detached HEAD' "$REPLY" '(1a2b3c4...)'
+  print 'ref: refs/heads/wt-branch' > $g/wtgit/HEAD
+  print "gitdir: ../wtgit" > $g/wt/.git
+  _lc_git_head $g/wt;               same 'prompt in a worktree (.git file)' "$REPLY" wt-branch
+  print 'ref: refs/heads/dev' > $g/repo/.git/HEAD
+  cd $g/repo/sub; _lc_prompt_precmd
+  local shown=${(%)_lc_prompt}
+  [[ $shown == *MINGW64*/repo/sub*' (dev)'* ]] && ok 'prompt shows tag, path and (branch)' || bad 'prompt shows tag, path and (branch)' "${(q-)shown}"
+  print 'ref: refs/heads/$(touch pwned)`touch pwned2`' > $g/repo/.git/HEAD
+  setopt prompt_subst; _lc_prompt_precmd; shown=${(%)_lc_prompt}; print -P -- "$PROMPT" >/dev/null; unsetopt prompt_subst
+  [[ ! -e pwned && ! -e pwned2 && $shown == *'($(touch pwned)`touch pwned2`)'* ]] && ok 'branch name is never executed' || bad 'branch name is never executed' "${(q-)shown}"
+  cd $g; _lc_prompt_precmd; shown=${(%)_lc_prompt}
+  [[ $shown != *'('* ]] && ok 'no (branch) outside a repo' || bad 'no (branch) outside a repo' "${(q-)shown}"
+  cd /; rm -rf $g
+
   local BUFFER
   BUFFER='echo ${name,,} ${name^^}'; _lc_bash_syntax
   same '${x,,} ${x^^}' "$BUFFER" 'echo ${(L)name} ${(U)name}'
