@@ -365,7 +365,8 @@ t_live() {     # $1 = gnu | bsd
   [[ $(ip -br a) == lo0* ]] && ok 'ip -br a' || bad 'ip -br a' "$(ip -br a 2>&1 | head -3)"
   ip r >/dev/null && ok 'ip r' || bad 'ip r'
   [[ $(lscpu) == *'CPU(s):'* ]] && ok lscpu || bad lscpu
-  [[ -n $(pidof zsh) ]] && ok pidof || bad pidof
+  [[ -n $(pidof zsh) ]] && ok pidof || bad pidof "got: [$(pidof zsh 2>&1)]" \
+    "zsh processes: $(command ps -axo pid=,comm= 2>&1 | grep -i zsh | tr '\n' '|')"
   same 'shuf -i 1-5' "$(shuf -i 1-5 | sort -n | tr '\n' ,)" 1,2,3,4,5,
   [[ $(uptime -p) == up\ * ]] && ok 'uptime -p' || bad 'uptime -p' "$(uptime -p)"
   ps aux --sort=-%mem >/dev/null && ok 'ps --sort' || bad 'ps --sort'

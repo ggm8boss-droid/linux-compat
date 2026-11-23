@@ -49,6 +49,13 @@ on a Mac by me; the user's friend tests it (`linuxcompat test`, then `linuxcompa
   the friend's Mac that way (2026-11-08, `kern.boottime` = `{ sec = N, usec = M } date`): keep command
   output in a quoted scalar first. Now covered by a fake-sysctl test.
 - Prompts containing `%` are zsh prompts (p10k, omz) and are never converted.
+- `pidof` must not use `pgrep`: a GNU `pgrep` (procps, e.g. from Homebrew) on PATH
+  reads `/proc`, which macOS lacks, so it finds nothing; `pgrep -x` also misses a
+  login shell, which macOS lists as `-zsh`. `bin/pidof` now reads the system
+  `ps -axo pid=,comm=` and matches the executable basename, stripping a login
+  shell's leading `-` (so `-zsh`, `/bin/zsh` and `zsh script` all match). Failed
+  on the friend's Mac (GNU tools installed), 2026-11-23; the test now prints the
+  pidof output and the zsh process list on failure.
 
 ## Testing
 - `tests/run-tests.zsh`: translations + fake-brew package/systemctl tests + interactive bash-habit
@@ -63,6 +70,7 @@ on a Mac by me; the user's friend tests it (`linuxcompat test`, then `linuxcompa
 - 2026-11-23: 138/138 pass (12 new prompt tests). Rendered prompt checked with print -P in Docker.
   Real macOS Terminal look (title, colours) not seen yet.
 - Branches: `main` = initial commit only; `testBranch` = try.sh + uptime fix (pushed, not merged);
-  `addGitUI` = testBranch + the prompt (2026-11-23). core.autocrlf=true: the working tree is CRLF
+  `addGitUI` = testBranch + the prompt (2026-11-23, merged via PR #1); `fixPidof` = pidof uses
+  `ps` not `pgrep` (2026-11-23). core.autocrlf=true: the working tree is CRLF
   after a checkout, so the tarball is built from an LF copy (zsh can't run CRLF scripts).
 - Package for the friend: `..\LinuxCompat-1.0.0.tar.gz` (rebuild with tar --exclude=state).
